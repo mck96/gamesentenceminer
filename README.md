@@ -51,9 +51,9 @@ uv run gsm
      orijinal satır gizlenir.
    - ⚙ menüsünden orijinal metni tamamen kapatabilirsin.
 
-Tam ekran modunda, oyundan uygulamaya dönünce ayrılmadan önceki oyun karesi
-donmuş olarak gösterilir (⚙ menüsünden kapatılabilir). Alternatif: **3 sn sonra
-dondur**.
+Oyundan uygulamaya dönünce, ayrılmadan hemen önceki oyun karesi donmuş olarak
+gösterilir. Böylece tek monitörde de bölge çizebilirsin. ⚙ menüsünden
+kapatılabilir. Alternatif: **3 sn sonra dondur**.
 
 Bölgeler ve ayarlar `~/.config/gamesentenceminer/settings.json` dosyasında saklanır.
 Durum çubuğunda uygulamanın işlemci kullanımı, kare hızı ve son OCR süresi görünür.
