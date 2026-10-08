@@ -14,17 +14,40 @@ def test_pixel_box_is_clipped_to_frame():
 
 def test_settings_roundtrip_and_bad_entries(tmp_path):
     path = tmp_path / "settings.json"
-    s = Settings(target_lang="en", regions=[Region("diyalog", (0.1, 0.7, 0.8, 0.2), "manual")])
+    s = Settings(target_lang="en", source="monitor")
+    s.regions.append(Region("diyalog", (0.1, 0.7, 0.8, 0.2), "manual"))
     s.save(path)
     loaded = Settings.load(path)
     assert loaded.target_lang == "en"
-    assert loaded.regions == [Region("diyalog", (0.1, 0.7, 0.8, 0.2), "manual")]
+    assert loaded.monitor_regions == [Region("diyalog", (0.1, 0.7, 0.8, 0.2), "manual")]
+    assert loaded.window_regions == []
 
     data = json.loads(path.read_text())
-    data["regions"].append({"name": "broken"})
+    data["monitor_regions"].append({"name": "broken"})
     data["unknown_key"] = 1
+    data["source"] = "nonsense"
     path.write_text(json.dumps(data))
-    assert [r.name for r in Settings.load(path).regions] == ["diyalog"]
+    loaded = Settings.load(path)
+    assert [r.name for r in loaded.monitor_regions] == ["diyalog"]
+    assert loaded.source == "window"
+
+
+def test_regions_follow_the_source():
+    s = Settings(source="window")
+    s.regions.append(Region("w", (0, 0, 1, 1)))
+    s.source = "monitor"
+    assert s.regions == []
+    s.regions.append(Region("m", (0, 0, 1, 1)))
+    s.source = "window"
+    assert [r.name for r in s.regions] == ["w"]
+
+
+def test_old_settings_regions_become_monitor_regions(tmp_path):
+    path = tmp_path / "settings.json"
+    path.write_text(json.dumps({"regions": [{"name": "eski", "rect": [0.1, 0.1, 0.5, 0.2]}]}))
+    loaded = Settings.load(path)
+    assert [r.name for r in loaded.monitor_regions] == ["eski"]
+    assert loaded.source == "window" and loaded.regions == []
 
 
 def test_missing_or_corrupt_settings_fall_back_to_defaults(tmp_path):

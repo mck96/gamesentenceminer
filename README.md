@@ -27,23 +27,33 @@ Betik şunları yapar:
 uv run gsm
 ```
 
-1. **Yakalamayı başlat**'a bas. İlk seferde GNOME'un ekran paylaşım penceresi
-   açılır. Monitörünü seç, **"Bu seçimi anımsa"** işaretli kalsın, **Paylaş**'a bas.
-   Sonraki açılışlarda bir daha sormaz.
-2. Oyuna geç (Alt+Tab), diyalog ekrandayken uygulamaya geri dön. **Dönünce dondur**
-   açıksa, ayrılmadan hemen önceki oyun karesi önizlemede donmuş olarak görünür.
-   Alternatif: **3 sn sonra dondur**'a basıp 3 saniye içinde oyuna geç.
+1. Araç çubuğunun solundan kaynağı seç:
+   - **Oyun penceresi** (önerilen): Sadece oyun yakalanır. Önizlemede masaüstü,
+     overlay ya da bu uygulama görünmez. Bölgeler oyun penceresine göre konumlanır.
+   - **Tüm ekran:** Monitörün tamamı yakalanır.
+2. **Yakalamayı başlat**'a bas. İlk seferde GNOME'un paylaşım penceresi açılır.
+   **Pencere** sekmesinden oyunu (ya da monitörünü) seç. **"Bu seçimi anımsa"**
+   işaretli kalsın, **Paylaş**'a bas. Sonraki açılışlarda bir daha sormaz. Başka
+   bir oyun seçmek için **Kaynağı yeniden seç**'e bas.
 3. Önizlemede diyalog kutusunun üstüne fareyle **dikdörtgen çiz**. İstediğin kadar
    bölge çizebilirsin.
    - Taşımak için sürükle.
    - Boyutlandırmak için sağ alt köşeden tut.
    - Silmek için Delete'e bas.
    - Yeniden adlandırmak için listede çift tıkla.
+   Pencere ve tüm ekran modlarının bölgeleri ayrı saklanır.
 4. **Oku**'ya bas: Okunan metin ve çevirisi alttaki panelde görünür.
 5. **Otomatik oku** açıkken oyuna dön. "Otomatik" moddaki bölgelerde metin değişip
    durduğunda kendiliğinden okunur.
 6. **Overlay üstte / altta** seçersen çeviri oyunun üstünde şerit olarak görünür.
-   Şerit tıklamaları oyuna geçirir. Şerit bölgenin üstüne gelse bile OCR onu görmez.
+   - Şerit tıklamaları oyuna geçirir.
+   - Yüksekliği metne göre ayarlanır. Uzun metinde yazı küçülür, gerekirse
+     orijinal satır gizlenir.
+   - ⚙ menüsünden orijinal metni tamamen kapatabilirsin.
+
+Tam ekran modunda, oyundan uygulamaya dönünce ayrılmadan önceki oyun karesi
+donmuş olarak gösterilir (⚙ menüsünden kapatılabilir). Alternatif: **3 sn sonra
+dondur**.
 
 Bölgeler ve ayarlar `~/.config/gamesentenceminer/settings.json` dosyasında saklanır.
 Durum çubuğunda uygulamanın işlemci kullanımı, kare hızı ve son OCR süresi görünür.

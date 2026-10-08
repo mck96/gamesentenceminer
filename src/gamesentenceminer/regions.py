@@ -27,15 +27,40 @@ class Region:
         return x0, y0, x1, y1
 
 
+SOURCES = ("window", "monitor")
+
+
+def _parse_regions(items) -> list[Region]:
+    regions = []
+    for r in items if isinstance(items, list) else []:
+        try:
+            rect = tuple(float(v) for v in r["rect"])
+            if len(rect) == 4:
+                mode = r.get("mode", "auto")
+                regions.append(Region(str(r["name"]), rect, mode if mode in MODES else "auto"))
+        except (KeyError, TypeError, ValueError):
+            continue
+    return regions
+
+
 @dataclass
 class Settings:
+    source: str = "window"  # window: just the game; monitor: the whole screen
     target_lang: str = "tr"
     auto_read: bool = True
     overlay: bool = False
     overlay_position: str = "top"  # top | bottom
+    overlay_original: bool = True
     freeze_on_return: bool = True
     max_fps: int = 5
-    regions: list[Region] = field(default_factory=list)
+    # Region coordinates are relative to the source, so each source keeps its own.
+    window_regions: list[Region] = field(default_factory=list)
+    monitor_regions: list[Region] = field(default_factory=list)
+
+    @property
+    def regions(self) -> list[Region]:
+        """The regions of the current source (a live list: mutate it in place)."""
+        return self.window_regions if self.source == "window" else self.monitor_regions
 
     @classmethod
     def load(cls, path: Path) -> Settings:
@@ -43,21 +68,20 @@ class Settings:
             data = json.loads(path.read_text(encoding="utf-8"))
         except (OSError, ValueError):
             return cls()
-        regions = []
-        for r in data.pop("regions", []):
-            try:
-                rect = tuple(float(v) for v in r["rect"])
-                if len(rect) == 4:
-                    mode = r.get("mode", "auto")
-                    regions.append(Region(str(r["name"]), rect, mode if mode in MODES else "auto"))
-            except (KeyError, TypeError, ValueError):
-                continue
+        if not isinstance(data, dict):
+            return cls()
+        window_regions = _parse_regions(data.pop("window_regions", []))
+        # Before window capture existed, "regions" held whole-screen regions.
+        monitor_regions = _parse_regions(data.pop("monitor_regions", data.pop("regions", [])))
         known = {k: v for k, v in data.items() if k in cls.__dataclass_fields__}
         try:
             settings = cls(**known)
         except TypeError:
             settings = cls()
-        settings.regions = regions
+        if settings.source not in SOURCES:
+            settings.source = "window"
+        settings.window_regions = window_regions
+        settings.monitor_regions = monitor_regions
         return settings
 
     def save(self, path: Path) -> None:

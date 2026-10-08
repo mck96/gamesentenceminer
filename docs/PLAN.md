@@ -372,8 +372,15 @@ Faz 1 ilk sürümü (`uv run gsm`):
 - 2560x1440 karede diyalog OCR'ı ~200 ms (2 iş parçacığı).
 - Metin değişmezken işlemci kullanımı %1-2, RAM ~310 MB.
 
+Senin makinende uygulamayla:
+- Overlay tam ekran oyunun üstünde görünüyor (X11).
+- OCR ve çeviri çalışıyor.
+- Ardından eklenenler: metne göre büyüyen şerit, "Oyun penceresi" kaynağı (sadece
+  oyunu yakalar), kaynağa göre ayrı bölgeler.
+
 Kalanlar:
-- Oyunla FPS ölçümü ve overlay testi (senin makinende).
+- Pencere yakalamanın oyunlarla denenmesi, oyunla FPS ölçümü (senin makinende).
+- Wayland oturumunda overlay testi (26.04'e geçince).
 - Kısayol → CLI → IPC.
 - Gerçek ekran görüntüleriyle OCR karşılaştırması.
 

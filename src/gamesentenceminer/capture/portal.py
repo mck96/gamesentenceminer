@@ -15,6 +15,8 @@ REQUEST_IFACE = "org.freedesktop.portal.Request"
 SESSION_IFACE = "org.freedesktop.portal.Session"
 
 SOURCE_MONITOR = 1
+SOURCE_WINDOW = 2
+SOURCE_TYPES = {"monitor": SOURCE_MONITOR, "window": SOURCE_WINDOW}
 CURSOR_HIDDEN = 1
 PERSIST_UNTIL_REVOKED = 2
 RESPONSE_TEXT = {1: "cancelled", 2: "failed"}
@@ -29,10 +31,14 @@ class PortalCancelled(PortalError):
 
 
 class TokenStore:
-    """The portal's restore token: lets later sessions skip the share dialog."""
+    """The portal's restore token: lets later sessions skip the share dialog.
 
-    def __init__(self) -> None:
-        self.path = state_dir() / "screencast_restore_token"
+    One per source kind, since a remembered monitor can't restore a window.
+    """
+
+    def __init__(self, source: str = "monitor") -> None:
+        suffix = "" if source == "monitor" else f"_{source}"
+        self.path = state_dir() / f"screencast_restore_token{suffix}"
 
     def load(self) -> str | None:
         try:
@@ -46,9 +52,12 @@ class TokenStore:
         self.path.parent.mkdir(parents=True, exist_ok=True)
         self.path.write_text(token)
 
+    def clear(self) -> None:
+        self.path.unlink(missing_ok=True)
+
 
 class ScreenCastPortal:
-    """Monitor screen cast session. Requests run a GLib loop on `context`.
+    """Screen cast session (one monitor or window). Requests run a GLib loop on `context`.
 
     Pass a private context (pushed as thread-default) to run the handshake in a
     worker thread, so the share dialog doesn't freeze the UI.
@@ -123,7 +132,8 @@ class ScreenCastPortal:
             raise PortalError(f"{method}: {RESPONSE_TEXT.get(outcome['code'], outcome['code'])}")
         return outcome["results"]
 
-    def start(self, restore_token: str | None) -> tuple[list, str | None]:
+    def start(self, restore_token: str | None,
+              source_type: int = SOURCE_MONITOR) -> tuple[list, str | None]:
         """Returns ([(node_id, props), ...], new_restore_token)."""
         version = self.get_property("version")
         cursor_modes = self.get_property("AvailableCursorModes")
@@ -132,7 +142,7 @@ class ScreenCastPortal:
                                 {"session_handle_token": GLib.Variant("s", self._token())})
         self.session_handle = results["session_handle"]
 
-        opts = {"types": GLib.Variant("u", SOURCE_MONITOR),
+        opts = {"types": GLib.Variant("u", source_type),
                 "multiple": GLib.Variant("b", False)}
         if cursor_modes & CURSOR_HIDDEN:
             # The mouse pointer over a text box would only confuse OCR.

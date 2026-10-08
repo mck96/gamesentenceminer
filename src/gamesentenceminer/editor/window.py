@@ -17,10 +17,12 @@ from PySide6.QtWidgets import (
     QListWidget,
     QListWidgetItem,
     QMainWindow,
+    QMenu,
     QPlainTextEdit,
     QPushButton,
     QSplitter,
     QToolBar,
+    QToolButton,
     QVBoxLayout,
     QWidget,
 )
@@ -35,6 +37,7 @@ TICK_MS = 200  # matches the default 5 fps capture
 PREVIEW_INACTIVE_S = 1.0  # refresh the preview at most this often while the game has focus
 RETURN_LOOKBACK_S = 0.4  # on coming back, show the frame from just before the switch
 LANGUAGES = [("Türkçe", "tr"), ("English", "en")]
+SOURCE_CHOICES = [("Oyun penceresi", "window"), ("Tüm ekran", "monitor")]
 MODE_LABELS = [("Otomatik", "auto"), ("Elle (Oku)", "manual")]
 OVERLAY_CHOICES = [("Overlay kapalı", "off"), ("Overlay üstte", "top"),
                    ("Overlay altta", "bottom")]
@@ -85,9 +88,21 @@ class MainWindow(QMainWindow):
         bar.setMovable(False)
         self.addToolBar(bar)
 
+        self.source_box = QComboBox()
+        for label, code in SOURCE_CHOICES:
+            self.source_box.addItem(label, code)
+        self.source_box.setCurrentIndex(max(0, self.source_box.findData(self.settings.source)))
+        self.source_box.setToolTip("Oyun penceresi: sadece oyun yakalanır (önerilen).\n"
+                                   "Tüm ekran: monitörün tamamı.")
+        self.source_box.currentIndexChanged.connect(self._on_source_changed)
+        bar.addWidget(self.source_box)
         self.act_capture = QAction("▶ Yakalamayı başlat", self)
         self.act_capture.triggered.connect(self._toggle_capture)
         bar.addAction(self.act_capture)
+        act_reselect = QAction("Kaynağı yeniden seç", self)
+        act_reselect.setToolTip("Hatırlanan seçimi unut ve GNOME'un seçim penceresini yeniden aç")
+        act_reselect.triggered.connect(self._reselect_source)
+        bar.addAction(act_reselect)
         bar.addSeparator()
 
         self.act_freeze = QAction("❄ Dondur", self, checkable=True)
@@ -99,12 +114,6 @@ class MainWindow(QMainWindow):
         act_delayed.setToolTip("Bas, 3 saniye içinde oyuna geç: o anki oyun karesi dondurulur")
         act_delayed.triggered.connect(lambda: QTimer.singleShot(3000, self._freeze_now))
         bar.addAction(act_delayed)
-        self.act_return = QAction("Dönünce dondur", self, checkable=True)
-        self.act_return.setChecked(self.settings.freeze_on_return)
-        self.act_return.setToolTip("Bu pencereye geri dönünce, ayrılmadan hemen önceki "
-                                   "(oyun) karesini göster")
-        self.act_return.toggled.connect(self._on_return_toggled)
-        bar.addAction(self.act_return)
         bar.addSeparator()
 
         act_read = QAction("🔍 Oku", self)
@@ -132,6 +141,22 @@ class MainWindow(QMainWindow):
         self.overlay_box.setCurrentIndex(max(0, self.overlay_box.findData(current)))
         self.overlay_box.currentIndexChanged.connect(self._on_overlay_changed)
         bar.addWidget(self.overlay_box)
+
+        options = QMenu(self)
+        self.act_return = options.addAction("Uygulamaya dönünce son oyun karesini dondur")
+        self.act_return.setCheckable(True)
+        self.act_return.setChecked(self.settings.freeze_on_return)
+        self.act_return.toggled.connect(self._on_return_toggled)
+        self.act_original = options.addAction("Overlay'de orijinal metni de göster")
+        self.act_original.setCheckable(True)
+        self.act_original.setChecked(self.settings.overlay_original)
+        self.act_original.toggled.connect(self._on_original_toggled)
+        options_button = QToolButton()
+        options_button.setText("⚙")
+        options_button.setToolTip("Seçenekler")
+        options_button.setMenu(options)
+        options_button.setPopupMode(QToolButton.ToolButtonPopupMode.InstantPopup)
+        bar.addWidget(options_button)
 
         self.canvas = FrameCanvas()
         self.canvas.region_drawn.connect(self._on_region_drawn)
@@ -203,8 +228,10 @@ class MainWindow(QMainWindow):
         self._starting = True
         self.reader.warm_up()  # load the OCR model while the user picks a monitor
         self.act_capture.setEnabled(False)
-        self.statusBar().showMessage("Yakalama başlatılıyor… (ilk seferde GNOME'un ekran "
-                                     "paylaşım penceresinden monitörünü seç)")
+        source = self.settings.source
+        what = "oyun penceresini" if source == "window" else "monitörünü"
+        self.statusBar().showMessage(f"Yakalama başlatılıyor… (ilk seferde GNOME'un paylaşım "
+                                     f"penceresinden {what} seç)")
 
         def worker():
             try:
@@ -214,11 +241,11 @@ class MainWindow(QMainWindow):
 
                     stream = ImageStream(self.fake_source, self.settings.max_fps)
                     stream.start()
-                    session = CaptureSession(stream, token_saved=True)
+                    session = CaptureSession(stream, source=source, token_saved=True)
                 else:
-                    from gamesentenceminer.capture import open_monitor_capture
+                    from gamesentenceminer.capture import open_capture
 
-                    session = open_monitor_capture(self.settings.max_fps)
+                    session = open_capture(source, self.settings.max_fps)
             except Exception as e:  # noqa: BLE001 - shown to the user
                 self._capture_failed.emit(str(e))
             else:
@@ -234,8 +261,10 @@ class MainWindow(QMainWindow):
         self.act_capture.setText("■ Yakalamayı durdur")
         notes = []
         if not session.token_saved:
-            notes.append("GNOME izni kaydetmedi: paylaşım penceresinde 'Bu seçimi anımsa' "
+            notes.append("GNOME seçimi kaydetmedi: paylaşım penceresinde 'Bu seçimi anımsa' "
                          "işaretliyse bir dahaki sefere sormaz.")
+        if session.source == "window":
+            notes.append("Oyun kapanıp açılınca GNOME pencereyi yeniden sorabilir.")
         if session.portal and not session.max_fps_negotiated:
             notes.append("GNOME düşük FPS isteğini kabul etmedi; kareler bizde düşürülüyor.")
         self.statusBar().showMessage(" ".join(["Yakalama çalışıyor.", *notes]), 15000)
@@ -291,7 +320,9 @@ class MainWindow(QMainWindow):
 
     def _masks(self, frame: np.ndarray) -> list[tuple[int, int, int, int]]:
         # Keep our own banner out of the OCR, or it would read its translation back.
-        if self.banner and self.banner.isVisible():
+        # A window capture contains only the game, so there is nothing to mask.
+        if (self.banner and self.banner.isVisible() and self.capture
+                and self.capture.source == "monitor"):
             return [self.banner.frame_rect(frame.shape[1], frame.shape[0])]
         return []
 
@@ -339,6 +370,34 @@ class MainWindow(QMainWindow):
     def _on_return_toggled(self, on: bool) -> None:
         self.settings.freeze_on_return = on
         self._save()
+
+    def _on_original_toggled(self, on: bool) -> None:
+        self.settings.overlay_original = on
+        if self.banner:
+            self.banner.set_show_original(on)
+        self._save()
+
+    # -- source --------------------------------------------------------------------
+
+    def _on_source_changed(self) -> None:
+        self.settings.source = self.source_box.currentData()
+        self._save()
+        self.reader.reset()
+        self._frozen = None
+        self.act_freeze.setChecked(False)
+        self._refresh_regions()
+        if self.capture:
+            self._stop_capture("Kaynak değişti.")
+            self._start_capture()
+
+    def _reselect_source(self) -> None:
+        from gamesentenceminer.capture import forget_source
+
+        forget_source(self.settings.source)
+        if self.capture:
+            self._stop_capture("Kaynak yeniden seçiliyor.")
+        if not self._starting:
+            self._start_capture()
 
     # -- reading -----------------------------------------------------------------
 
@@ -390,7 +449,7 @@ class MainWindow(QMainWindow):
                 self.banner.hide()
             return
         if self.banner is None:
-            self.banner = Banner(self.settings.overlay_position)
+            self.banner = Banner(self.settings.overlay_position, self.settings.overlay_original)
         self.banner.set_position(self.settings.overlay_position)
 
     # -- regions -----------------------------------------------------------------

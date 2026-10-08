@@ -36,6 +36,17 @@ bunu anahtara çevirir.
 **Overlay testi çalışmadı:** Betik `uv run` yerine `python3` ile başlatıldı.
 `python3` sistem Python'unu kullanır ve orada PySide6 yok.
 
+### Uygulamanın ilk sürümüyle (8 Ekim, gece)
+
+- **Overlay tam ekran oyunun üstünde göründü** (X11 oturumu, Steam oyunu). Pencere
+  yöneticisini atlayan (override-redirect) pencere yöntemi X11'de çalışıyor.
+- OCR, uzun bir İngilizce paragrafı doğru okudu ve çeviri geldi.
+- **Sorun 1:** Şeridin yüksekliği sabitti, uzun metin kesildi. Çözüm: şerit artık
+  metne göre büyüyor. Sığmazsa yazı küçülüyor, sonra orijinal gizleniyor, en fazla
+  ekranın %45'i kadar yer kaplıyor.
+- **Sorun 2:** Tüm ekran yakalanıyordu. Çözüm: "Oyun penceresi" kaynağı eklendi
+  (portalın pencere paylaşımı).
+
 ### Kalan testler
 
 Kalan testler 2b, 2c ve 3. Hepsini `uv run ...` ile çalıştır. Kısayol olarak artık

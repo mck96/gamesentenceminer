@@ -123,6 +123,12 @@ class TextReader(QObject):
         """Load the OCR model in the background so the first read isn't slow."""
         self._ocr_pool.submit(self.ocr.recognize, np.zeros((64, 256, 3), np.uint8))
 
+    def reset(self) -> None:
+        """Forget every region's state (e.g. after switching the capture source)."""
+        self._watchers.clear()
+        self._last_crop.clear()
+        self._last_text.clear()
+
     def forget(self, region_name: str) -> None:
         self._watchers.pop(region_name, None)
         self._last_crop.pop(region_name, None)
