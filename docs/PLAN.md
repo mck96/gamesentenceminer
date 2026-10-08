@@ -352,12 +352,30 @@ Her `oto` bölge için, gelen her karede (≤5 FPS):
 
 ## 11. Fazlar
 
-**Şu anki durum: Faz 0.**
-- Hazır olanlar: `check_env.py`, `capture_portal.py`, `overlay_test.py`.
-  Bulut ortamında gerçek PipeWire + sahte portalla doğrulandılar
-  (ayrıntılar [FAZ0.md](FAZ0.md)'de).
-- Beklenen: senin makinendeki sonuçlar.
-- Sıradaki: kısayol → CLI → IPC denemesi ve OCR karşılaştırması (`tools/bench.py`).
+**Şu anki durum: Faz 0 kısmen tamam, Faz 1 MVP'nin ilk sürümü çalışıyor.**
+
+Faz 0, senin makinende:
+- Portal ile yakalama çalışıyor.
+- GNOME düşük FPS isteğini kabul ediyor (en fazla 5 kare/sn).
+- Bizim işlemci kullanımımız %0,7.
+- İzin, paylaşım penceresinde "Bu seçimi anımsa" işaretliyse hatırlanıyor.
+- Ayrıntılar [FAZ0.md](FAZ0.md)'de.
+
+Faz 1 ilk sürümü (`uv run gsm`):
+- OBS tarzı pencere, canlı/dondurulmuş önizleme, "dönünce dondur".
+- Önizlemede çoklu bölge çizme, taşıma, boyutlandırma, silme.
+- Değişim algılamalı otomatik okuma, RapidOCR (PP-OCRv6).
+- Anahtarsız Google çevirisi, metin çıktısı paneli.
+- Overlay şeridi, kendi metnini okumasın diye OCR'dan maskelenir.
+
+Ölçümler (bulutta, oyun görüntüsü yerine görsel kullanılarak):
+- 2560x1440 karede diyalog OCR'ı ~200 ms (2 iş parçacığı).
+- Metin değişmezken işlemci kullanımı %1-2, RAM ~310 MB.
+
+Kalanlar:
+- Oyunla FPS ölçümü ve overlay testi (senin makinende).
+- Kısayol → CLI → IPC.
+- Gerçek ekran görüntüleriyle OCR karşılaştırması.
 
 Not: Ekran yakalama, overlay ve GPU testleri senin masaüstünde çalışmalı. Bulut
 geliştirme ortamı ekranına erişemez. Bu yüzden Faz 0 betiklerini ben yazarım, sen

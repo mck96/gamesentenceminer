@@ -9,6 +9,38 @@ Amaç: Plandaki iki büyük belirsizliği senin bilgisayarında ölçmek.
 
 Toplam süre yaklaşık 20-30 dakika. Bir oyun açık olacak.
 
+## Senin makinendeki sonuçlar
+
+### Ortam ve ilk yakalama (8 Ekim)
+
+**Ortam:**
+- Ubuntu 24.04.5, GNOME 46.0, **X11 oturumu**.
+- RTX 4070 SUPER (sürücü 580), 2560x1440 @ 144 Hz.
+- ScreenCast portalı sürüm 5, GlobalShortcuts portalı yok (beklenen).
+
+**Yakalama (masaüstünde, oyunsuz):**
+
+| Ölçüt | Sonuç |
+|---|---|
+| Portal + PipeWire | Çalıştı |
+| Düşük FPS isteği (`max-framerate`) | **Kabul edildi**: GNOME saniyede en fazla 5 kare gönderiyor. Sabit masaüstünde ortalama 2,7, çünkü sadece ekran değişince kare geliyor |
+| Bizim işlemci kullanımımız | %0,7 (tek çekirdeğin), RAM 113 MB |
+| gnome-shell işlemci kullanımı | Akış açıkken %5,3. Akışsız baz değer henüz ölçülmedi (2c) |
+| Örnek kare | Siyah değil (ortalama parlaklık 68) |
+
+**İzin hatırlanmadı.** GNOME kaynak koduna göre bunun tek nedeni, paylaşım
+penceresindeki **"Bu seçimi anımsa"** kutusunun işaretsiz olması. Kutu varsayılan
+olarak işaretli gelir. İşaretliyken GNOME geri yükleme verisini döndürür, portal da
+bunu anahtara çevirir.
+
+**Overlay testi çalışmadı:** Betik `uv run` yerine `python3` ile başlatıldı.
+`python3` sistem Python'unu kullanır ve orada PySide6 yok.
+
+### Kalan testler
+
+Kalan testler 2b, 2c ve 3. Hepsini `uv run ...` ile çalıştır. Kısayol olarak artık
+uygulamanın kendisiyle de denenebilir: `uv run gsm`, overlay'i "üstte" seç, oyuna geç.
+
 ## Kurulum
 
 ```bash

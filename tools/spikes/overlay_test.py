@@ -25,9 +25,13 @@ import signal
 import sys
 import time
 
-from PySide6.QtCore import QRectF, Qt, QTimer
-from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPainterPath
-from PySide6.QtWidgets import QApplication, QWidget
+try:
+    from PySide6.QtCore import QRectF, Qt, QTimer
+    from PySide6.QtGui import QColor, QFont, QGuiApplication, QPainter, QPainterPath
+    from PySide6.QtWidgets import QApplication, QWidget
+except ImportError:
+    sys.exit("PySide6 not found: run ./scripts/setup_ubuntu.sh once, then start this with\n"
+             "    uv run tools/spikes/overlay_test.py")
 
 SAMPLE_LINES = ("どこへ行くの？   你要去哪里？", "Nereye gidiyorsun?  ·  Where are you going?")
 

@@ -512,6 +512,9 @@ def print_summary(report: Report, report_path: Path) -> None:
     if not report.fake_source:
         print(f"permission: token {'reused' if report.restore_token_used else 'not present'}, "
               f"new token {'saved' if report.restore_token_saved else 'NOT returned'}")
+        if not report.restore_token_saved:
+            print("  hint: GNOME only remembers the choice when 'Remember this selection'"
+                  " ('Bu seçimi anımsa') is ticked in the share dialog")
     print(f"stream size: {report.stream_size}  max-framerate negotiation: "
           f"{report.max_fps_negotiation}")
     print(f"source caps: {report.source_caps}")

@@ -7,10 +7,16 @@ license = "MIT"
 requires-python = ">=3.12"
 dependencies = [
     "numpy>=1.26",
+    "onnxruntime>=1.20",
+    "opencv-python-headless>=4.8",
     "pillow>=10.0",
     "PyGObject>=3.50",
     "PySide6-Essentials>=6.7",
+    "rapidocr>=3.9",
 ]
+
+[project.scripts]
+gsm = "gamesentenceminer.app:main"
 
 [dependency-groups]
 dev = [
@@ -39,3 +45,6 @@ testpaths = ["tests"]
 # Use uv's own Python build so the environment doesn't depend on the distro's
 # Python (Ubuntu 24.04 -> 26.04 changes it) or on python3-dev being installed.
 python-preference = "only-managed"
+# rapidocr depends on opencv-python, whose bundled Qt plugins clash with PySide6;
+# use the headless build instead.
+override-dependencies = ["opencv-python; sys_platform == 'never'"]

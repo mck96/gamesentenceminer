@@ -21,6 +21,10 @@ if ! command -v uv >/dev/null 2>&1; then
   echo "==> Installing uv (Python package manager, https://docs.astral.sh/uv/)"
   curl -LsSf https://astral.sh/uv/install.sh | sh
   export PATH="$HOME/.local/bin:$PATH"
+else
+  # Old uv releases can't read newer lock files; update when uv manages itself.
+  uv self update >/dev/null 2>&1 || echo "note: could not self-update uv ($(uv --version));" \
+    "if 'uv sync' fails, update uv the way you installed it"
 fi
 
 echo "==> Python environment (first run builds PyGObject, takes a minute)"
