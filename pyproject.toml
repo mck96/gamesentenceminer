@@ -1,0 +1,41 @@
+[project]
+name = "gamesentenceminer"
+version = "0.0.1"
+description = "Lightweight game screen OCR + translation tool for Linux (Wayland)"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.12"
+dependencies = [
+    "numpy>=1.26",
+    "pillow>=10.0",
+    "PyGObject>=3.50",
+    "PySide6-Essentials>=6.7",
+]
+
+[dependency-groups]
+dev = [
+    "pytest>=8.0",
+    "ruff>=0.6",
+]
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/gamesentenceminer"]
+
+[tool.ruff]
+line-length = 100
+target-version = "py312"
+
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "B", "UP"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+
+[tool.uv]
+# Use uv's own Python build so the environment doesn't depend on the distro's
+# Python (Ubuntu 24.04 -> 26.04 changes it) or on python3-dev being installed.
+python-preference = "only-managed"

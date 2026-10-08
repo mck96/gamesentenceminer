@@ -184,6 +184,7 @@ tests/
 tools/
   bench.py              # OCR hız/doğruluk karşılaştırması
   spikes/               # Faz 0 deneme betikleri
+  dev/                  # geliştirme araçları (ör. sahte ScreenCast portalı)
 ```
 
 **Profil örneği** (`~/.config/gamesentenceminer/profiles/ornek-oyun.toml`):
@@ -350,6 +351,13 @@ Her `oto` bölge için, gelen her karede (≤5 FPS):
    atlanır.
 
 ## 11. Fazlar
+
+**Şu anki durum: Faz 0.**
+- Hazır olanlar: `check_env.py`, `capture_portal.py`, `overlay_test.py`.
+  Bulut ortamında gerçek PipeWire + sahte portalla doğrulandılar
+  (ayrıntılar [FAZ0.md](FAZ0.md)'de).
+- Beklenen: senin makinendeki sonuçlar.
+- Sıradaki: kısayol → CLI → IPC denemesi ve OCR karşılaştırması (`tools/bench.py`).
 
 Not: Ekran yakalama, overlay ve GPU testleri senin masaüstünde çalışmalı. Bulut
 geliştirme ortamı ekranına erişemez. Bu yüzden Faz 0 betiklerini ben yazarım, sen
