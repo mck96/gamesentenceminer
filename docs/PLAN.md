@@ -1,151 +1,149 @@
-# Oyun Ekranı OCR + Çeviri Aracı: Plan (Taslak v0.1)
+# Oyun Ekranı OCR + Çeviri Aracı: Plan (Taslak v0.2)
 
-> Durum: taslak. "Açık kararlar" bölümündeki sorular cevaplanınca güncellenecek.
+## 0. Alınan kararlar
+
+| Konu | Karar |
+|---|---|
+| Arayüz | **OBS Studio tarzı.** Kaynak (ekran/pencere) seçilir, oyun görüntüsü önizlemede görünür, metin alanları önizleme üstünde dikdörtgen olarak çizilir. Birden fazla bölge desteklenir |
+| Oyun dilleri | Ağırlıklı İngilizce, Japonca, Çince |
+| Çeviri hedefi | Türkçe ve İngilizce (profil başına seçilir, ikisi birden de gösterilebilir) |
+| Oyun tarzı | Her tür oyun, genelde **tam ekran** |
+| Dil öğrenme | İstenen ama sonraki aşama. Anki ilk aşamada yok, veri modeli şimdiden buna uygun tutulur (bkz. §9) |
+| Platform | Ubuntu 24.04. Öneri: **"Ubuntu on Xorg" oturumuna geçmek** (gerekçesi §6'da) |
 
 ## 1. Hedef
 
-Oyun oynarken ekrandaki belirli metin alanlarını (diyalog kutusu, altyazı, menü,
-eşya açıklaması) yakalayan, OCR ile okuyan ve anında çeviren bir masaüstü aracı.
-
-- Platform: Ubuntu 24.04 (GNOME 46)
-- En önemli kısıt: **hafif olmalı**, oyun oynarken bilgisayarı zorlamamalı.
+Oyun oynarken ekrandaki metin alanlarını (diyalog kutusu, konuşan kişinin adı,
+altyazı, menü) yakalayan, OCR ile okuyan ve anında çeviren bir masaüstü aracı.
+En önemli kısıt: **hafif olmalı**, oyun oynarken bilgisayarı zorlamamalı.
 
 ## 2. Hafiflik ilkeleri
 
 Programın neredeyse tüm maliyeti OCR'dan gelir. Bu yüzden asıl iş OCR'ı mümkün
 olduğunca az çalıştırmak:
 
-1. **Tam ekranı asla sürekli OCR'lama.** Sadece seçili küçük bölgeler yakalanır.
-2. **OCR sadece metin değişip sabitlendiğinde çalışır.** Değişim algılama çok
-   ucuz (küçültülmüş gri görüntüde kare farkı, < 1 ms). Metin değişmiyorsa
-   işlemci neredeyse hiç kullanılmaz.
-3. **Daktilo efekti bitene kadar bekle.** Bölge K kare boyunca sabit kalınca tek
-   bir OCR yapılır; harf harf beliren metin için 10 kez OCR yapılmaz.
-4. **GPU oyuna kalır.** OCR varsayılan olarak CPU'da, 1-2 thread ile ve düşük
-   öncelikte (`nice`) çalışır. Küçük kırpılmış görüntülerde CPU yeterince hızlı.
-5. **Tekrar yok.** Aynı/çok benzer metin tekrar OCR'lanmaz veya çevrilmez,
-   çeviriler SQLite'ta önbelleğe alınır.
-6. **Birikme yok.** Kuyruklar tek elemanlı: OCR yetişemezse eski kare atılır.
-7. **Tembel yükleme.** Modeller ilk ihtiyaçta yüklenir, kullanılmayan motor RAM
-   tutmaz.
+1. **Oyun sırasında tam ekran işlenmez.** Sadece çizilen bölgeler yakalanır.
+2. **OCR sadece metin değişip sabitlendiğinde çalışır.** Değişim algılama çok ucuz
+   (küçültülmüş gri görüntüde kare farkı, < 1 ms). Metin değişmiyorsa işlemci
+   neredeyse hiç kullanılmaz.
+3. **Daktilo efekti bitene kadar bekle.** Bölge K kare sabit kalınca tek bir OCR
+   yapılır.
+4. **GPU oyuna kalır.** OCR CPU'da, 1-2 thread ile, düşük öncelikte (`nice`)
+   çalışır.
+5. **Önizleme bedava değildir.** Canlı önizleme sadece düzenleyici penceresi
+   görünürken çalışır (bkz. §3).
+6. **Tekrar yok.** Benzer metin tekrar OCR'lanmaz veya çevrilmez, çeviriler
+   SQLite'ta önbelleğe alınır.
+7. **Birikme yok.** Kuyruklar tek elemanlı: OCR yetişemezse eski kare atılır.
+8. **Tembel yükleme.** Modeller ilk ihtiyaçta yüklenir.
 
-**Hedef bütçe** (Faz 0'da makinende ölçülecek):
+**Hedef bütçe** (Faz 0'da ölçülecek):
 
 | Ölçüt | Hedef |
 |---|---|
-| Boşta CPU (metin değişmiyorken) | tek çekirdeğin %1-2'si altı |
-| RAM | ~300-400 MB altı (ağır motor seçilmezse) |
-| Metin değişiminden çeviri görünene kadar | ~1 sn altı |
+| Oyun sırasında, metin değişmiyorken CPU | tek çekirdeğin %1-2'si altı |
+| RAM | ~300-400 MB altı |
+| Metin değişiminden çevirinin görünmesine | ~1 sn altı |
 
-## 3. Çalışma modları
+## 3. Arayüz: OBS tarzı düzenleyici
 
-| Mod | Ne yapar | Arka plan yükü |
-|---|---|---|
-| **Kısayol** | Tuşa bas, kayıtlı bölge(ler) bir kez okunup çevrilir | Sıfır |
-| **Otomatik izleme** | Bölgeler 2-4 FPS izlenir, metin değişince OCR + çeviri | Çok düşük |
-| **Serbest seçim** | Kısayolla ekranda dikdörtgen çiz, o alan bir kez okunur | Sıfır |
-
-Otomatik izleme diyalog kutuları için, serbest seçim ise menüler ve tek seferlik
-yazılar için kullanılır.
-
-## 4. Metin alanı seçimi
-
-Öneri: **manuel seçim temel yöntem olsun, otomatik tespit sadece yardımcı olsun.**
-
-- **Manuel seçim:** Yarı saydam tam ekran katmanda fareyle dikdörtgen çizilir.
-  Birden fazla bölge olabilir, her birine ad verilir ("diyalog", "konuşan kişi").
-  Her bölgenin kendi ayarı olur: mod, FPS, ön işleme.
-- **Otomatik öneri (tek seferlik):** Bir tuşla tam ekranda bir kez *metin
-  tespiti* çalışır. Bulunan kutular ekranda gösterilir, tıklayarak kabul edip
-  boyutlarını ayarlarsın. Sadece kurulum sırasında çalıştığı için oyun sırasında
-  yük bindirmez.
-- **Sürekli tam otomatik bölge bulma önerilmez.** Hem pahalı hem de HUD, sayı ve
-  arayüz yazıları yüzünden çok yanlış alarm verir.
-- Bölgeler **oyun profiline** kaydedilir. X11'de koordinatlar oyun penceresine
-  göre oransal tutulur, böylece pencere taşınınca veya çözünürlük değişince bölgeler
-  bozulmaz.
-
-## 5. Ubuntu 24.04'teki kritik konu: Wayland ve X11
-
-Ubuntu 24.04 varsayılan olarak **GNOME 46 + Wayland** ile gelir. Wayland güvenlik
-gereği ekran yakalamayı, global kısayolları ve "her zaman üstte" pencereleri
-kısıtlar. Tasarımı en çok bu konu etkiler.
-
-| Konu | X11 ("Ubuntu on Xorg" oturumu) | Wayland (varsayılan) |
-|---|---|---|
-| Ekran yakalama | `mss` (XShm) ile çok hızlı, izin gerekmez | XDG Portal ScreenCast + PipeWire. Bir kez izin istenir, izin hatırlanabilir (restore token) |
-| Global kısayol | Doğrudan (XGrabKey) | GNOME 46'da uygulamalar global kısayol tanımlayamaz (GlobalShortcuts portalı GNOME 48 ile geldi). Çözüm: GNOME Ayarlar'da özel kısayol tanımlanır ve bizim CLI komutunu çağırır, komut da IPC ile çalışan uygulamaya iletir |
-| Üstte duran, tıklamayı geçiren overlay | Kolay | Uygulama XWayland ile (`QT_QPA_PLATFORM=xcb`) çalıştırılır. Tam ekran oyunda görünmeyebilir, bu yüzden "kenarlıksız pencere" modu önerilir |
-| Aktif pencere / pencere konumu | Okunabilir, profil otomatik seçilir | Okunamaz. Mutlak ekran koordinatları kullanılır, profil elle seçilir |
-
-**Öneri:**
-- MVP **X11 yolu** üzerine kurulur: en hızlı geliştirilen ve en hafif yol bu.
-- Ekran yakalama soyut bir `CaptureBackend` arayüzünün arkasında olur. Wayland
-  desteği sonraki fazda ayrı bir backend olarak eklenir, mimari değişmez.
-- Steam/Proton oyunlarının çoğu Wayland oturumunda da XWayland üzerinden çalışır.
-  Bu yüzden X11 yakalama yolu bazı oyunlarda Wayland'da da çalışabilir, ama garanti
-  değil. Faz 0'da senin makinende test edilecek.
-
-Oturum tipini görmek için: `echo $XDG_SESSION_TYPE`
-
-## 6. OCR motoru (oyunun diline bağlı)
-
-Motorlar takılıp çıkarılabilir (`OcrEngine` arayüzü), her profilde ayrı seçilir.
-
-| Motor | Dil | Artı | Eksi |
-|---|---|---|---|
-| **meikiocr** | Japonca | Oyun metni için eğitilmiş, yerel, küçük modeller (tespit "tiny" ~30 ms CPU) | Genç proje, CPU'daki tanıma hızı ölçülmeli |
-| **RapidOCR (PP-OCRv5, ONNX)** | Çince/Japonca/İngilizce tek model, başka diller | ONNX Runtime, CPU'da hızlı, PyTorch gerekmez | Stilize fontlarda meikiocr'dan zayıf olabilir |
-| **Tesseract** | İngilizce/Latin | Çok hafif, apt ile kurulur | Ön işleme ister, Japoncada zayıf |
-| **manga-ocr** | Japonca | Çok isabetli | PyTorch, ~1 GB+ RAM, hafiflik hedefiyle çelişir |
-| Google Lens (çevrimiçi) | Çoğu dil | Çok isabetli, yerel yük yok | İnternet, gecikme, resmi olmayan API |
-
-**Ön işleme** (profil başına): 2x büyütme, gri ton, gerekirse eşikleme veya ters
-çevirme (koyu zemin üzerinde açık yazı), metin rengine göre renk filtresi.
-
-## 7. Çeviri
-
-`Translator` arayüzü ile takılabilir:
-
-- **Çevrimiçi** (bilgisayara sıfır yük, hafiflik açısından en iyisi):
-  - DeepL API Free: aylık 500k karakter, JA/EN → TR destekli. Varsayılan önerim bu.
-  - Google Translate
-  - LLM API: bağlama duyarlı ve oyunun tonunu koruyan çeviri. Önceki birkaç satır
-    ve karakter isimleri bağlam olarak gönderilebilir.
-- **Çevrimdışı:**
-  - Argos Translate / Opus-MT / NLLB-200 (CTranslate2, int8, CPU). Doğrudan
-    JA→TR modelleri zayıf olduğu için genelde JA→EN→TR pivotu gerekir.
-  - Yerel LLM (llama.cpp/Ollama): kaliteli, ama GPU ve RAM için oyunla yarışır.
-    "Hafif" hedefiyle çeliştiği için varsayılan olmayacak.
-- **Önbellek + geçmiş:** SQLite'ta tutulur (orijinal metin, çeviri, oyun, zaman).
-
-## 8. Gösterim
-
-- **Overlay:** Oyunun üstünde duran, tıklamaları oyuna geçiren yarı saydam kutu.
-  - *Banner:* ekranın altında altyazı şeridi
-  - *Yerinde:* ilgili bölgenin hemen altında veya üstünde
-- **Panel penceresi:** Orijinal metin, çeviri ve geçmiş. İkinci monitör için ideal,
-  oyuna hiç dokunmaz.
-- **Pano (isteğe bağlı):** Metni panoya kopyalar, Yomitan gibi sözlük araçlarıyla
-  birlikte kullanılabilir.
-- **Tray ikonu:** duraklat/devam, profil seç, bölge düzenle, mod değiştir.
-
-## 9. Mimari
-
-**Teknoloji:** Python 3.12 (Ubuntu 24.04 varsayılanı) + PySide6 (Qt).
-- Python'un yükü sorun değil: ağır işler native kütüphanelerde (ONNX Runtime,
-  mss, Qt) yapılır, düşük FPS'te küçük bölgelerle Python ek yükü önemsizdir.
-- OCR ekosisteminin tamamı Python'da.
-- Qt şeffaf overlay, tray, seçim katmanı ve paneli tek toolkit'le çözer.
+OBS'un kendisini kullanmıyoruz, çünkü bu iş için gereksiz ağır. Sadece arayüz
+mantığını alıyoruz: **kaynak → önizleme → bölgeler**.
 
 ```
-             ┌──────────── Profil / Bölgeler ◄──── Bölge seçici (manuel / öneri)
-             ▼
- Yakalama (bölge, N FPS) ─► Değişim algılama ─► Stabilite kapısı ─► OCR işçisi
-                                                                       │
- UI (overlay / panel / pano) ◄── Çevirmen (+önbellek) ◄── Tekrar filtresi ◄┘
+┌──────────────────────────────────────────────────────────────────────────┐
+│ Profil: [Örnek Oyun v]   Kaynak: [Ekran 1 v]   [Canlı|Dondur]  [Başlat]  │
+├──────────────┬────────────────────────────────────────┬──────────────────┤
+│ Kaynaklar    │                                        │ Bölgeler         │
+│ (o) Ekran 1  │      ÖNİZLEME (oyunun görüntüsü)       │ ■ diyalog  oto   │
+│ ( ) Ekran 2  │                                        │ ■ isim   bağlı   │
+│ ( ) Pencere  │  ┌─ isim ──────┐                       │ ■ menü  kısayol  │
+│              │  └─────────────┘                       │ [+ Yeni] [Öner]  │
+│              │  ┌─ diyalog ─────────────────────────┐ │                  │
+│              │  │                                   │ │ Seçili bölge:    │
+│              │  └───────────────────────────────────┘ │  dil, mod, FPS   │
+│              │                       ┌─ menü ───┐     │  ön işleme       │
+│              │                       └──────────┘     │ [Test OCR]       │
+├──────────────┴────────────────────────────────────────┴──────────────────┤
+│ Son satırlar:                                                            │
+│  [isim] Where are you going?  ->  Nereye gidiyorsun?                     │
+└──────────────────────────────────────────────────────────────────────────┘
+```
 
- Tetikleyiciler: Tray · Kısayol (X11) · CLI/IPC (Wayland'da GNOME kısayolu)
+### 3.1 Kaynaklar
+- **Ekran (monitör):** Tam ekran oyunlar için varsayılan ve en güvenilir kaynak.
+  Oyun tam ekransa monitör görüntüsü zaten oyunun kendisidir.
+- **Pencere:** Pencereli oyunlar için. X11'de koordinatlar pencereye göre tutulur,
+  pencere taşınsa da bölgeler bozulmaz.
+
+### 3.2 Bölgeler (birden fazla)
+- Önizleme üstünde fareyle çizilir. Taşınabilir, köşelerinden boyutlandırılır,
+  her biri adlandırılır ve renklendirilir.
+- Koordinatlar kaynağa göre oransal (0-1) saklanır. Önizlemenin boyutu veya oyunun
+  çözünürlüğü değişse de bölgeler doğru kalır.
+- Her bölgenin bir **modu** vardır:
+
+| Mod | Ne zaman | Örnek |
+|---|---|---|
+| `oto` | Bölge izlenir, metin değişip sabitlenince okunur | Diyalog kutusu, altyazı |
+| `bağlı` | Kendisi izlenmez. Bağlı olduğu bölge tetiklenince onunla birlikte okunur | Konuşan kişinin adı (diyalogla birlikte) |
+| `kısayol` | Sadece kısayola basınca okunur | Menü, eşya açıklaması |
+
+- **[Test OCR]:** Seçili bölgeyi o anki karede hemen okur ve çevirir. Ayar yaparken
+  sonucu anında görürsün.
+- **[Öner]** (sonraki faz): O karede bir kez metin tespiti çalıştırır ve aday
+  kutular önerir. Tek seferlik olduğu için oyun sırasında yük bindirmez.
+
+### 3.3 Canlı ve dondurulmuş önizleme
+
+| | Canlı | Dondur |
+|---|---|---|
+| Ne gösterir | Kaynağın akışını, 5-10 FPS, küçültülmüş | Tek bir kareyi, 1:1 netlikte |
+| Maliyet | Sadece düzenleyici görünürken. Simge durumunda veya gizliyken 0 | Sıfır sürekli maliyet |
+| İdeal kullanım | İki monitör: oyun birinde, düzenleyici diğerinde | Tek monitörde tam ekran oyun |
+
+**Tek monitörde tam ekran oyunda bölge çizme akışı:**
+1. Oyun açıkken kısayola basılır (ör. `Ctrl+Alt+E`) ve o anki kare dondurulur.
+2. Düzenleyici açılır ve dondurulmuş kareyi gösterir.
+3. Dikdörtgenler çizilir, [Test OCR] ile denenir, kaydedilir.
+4. Oyuna dönülür. Bölgeler artık arka planda izleniyor.
+
+Profil oyun başına bir kez hazırlanır, sonra sadece [Başlat] denir.
+
+## 4. Çeviriyi gösterme (tam ekran öncelikli)
+
+1. **Overlay (asıl yöntem):** Tam ekran oyunun üstünde duran, tıklamaları oyuna
+   geçiren, yarı saydam bir kutu.
+   - *Banner:* ekranın altında altyazı şeridi
+   - *Yerinde:* ilgili bölgenin hemen altında veya üstünde
+   - X11'de bunun için pencere yöneticisini atlayan (override-redirect),
+     tıklamayı geçiren bir pencere kullanılır:
+     `FramelessWindowHint | WindowStaysOnTopHint | X11BypassWindowManagerHint | WindowTransparentForInput`
+   - Linux'ta Wine/Proton dahil "tam ekran" genelde ekranı kaplayan bir
+     penceredir, bu yüzden overlay'in üstte görünmesi beklenir. **Faz 0'da senin
+     makinende birkaç oyunla doğrulanacak.**
+2. **Düzenleyicinin "son satırlar" paneli:** İki monitörde ideal.
+3. **Pano (isteğe bağlı):** Sözlük araçlarıyla kullanmak için.
+
+## 5. Mimari
+
+**Teknoloji:** Python 3.12 (Ubuntu 24.04 varsayılanı) + PySide6 (Qt).
+- Ağır işler native kütüphanelerde yapılır (ONNX Runtime, mss, Qt). Düşük FPS'te
+  küçük bölgelerle Python'un ek yükü önemsizdir.
+- OCR ekosisteminin tamamı Python'da.
+- Qt düzenleyiciyi, overlay'i ve tray'i tek toolkit'le çözer.
+
+```
+ Düzenleyici (OBS tarzı) ──► Profil: kaynak + bölgeler + ayarlar
+                                   │
+                                   ▼
+ Yakalama (sadece bölgeler) ─► Değişim algılama ─► Stabilite kapısı ─► OCR işçisi
+                                                                          │
+ Overlay / panel / pano ◄── Çevirmen (+önbellek) ◄── Tekrar filtresi ◄────┤
+                                                                          ▼
+                                                     Satır geçmişi (SQLite + kırpıntı)
+
+ Tetikleyiciler: Tray · Global kısayol (X11) · CLI/IPC (Wayland'da GNOME kısayolu)
 ```
 
 **Modül yapısı** (paket adı geçici):
@@ -155,23 +153,27 @@ src/gamesentenceminer/
   app.py              # giriş noktası, tray, ana döngü
   config.py           # ayarlar + oyun profilleri (TOML)
   capture/
-    base.py           # CaptureBackend arayüzü
-    x11.py            # mss ile yakalama
+    base.py           # CaptureBackend: list_sources(), grab(rect), grab_full()
+    x11.py            # mss (XShm) ile yakalama
     wayland.py        # Portal ScreenCast + PipeWire (Faz 3)
-  regions/
-    selector.py       # dikdörtgen çizme katmanı
-    suggest.py        # tek seferlik metin tespiti ile öneri (Faz 4)
+  editor/
+    window.py         # OBS tarzı ana pencere
+    canvas.py         # önizleme + dikdörtgen çizme/taşıma/boyutlandırma
+    suggest.py        # [Öner]: tek seferlik metin tespiti (Faz 4)
   pipeline/
     watcher.py        # değişim algılama + stabilite kapısı
     dedup.py          # benzer metin filtresi
+    langdetect.py     # yazı sistemi tespiti: kana → ja, sadece Han → zh, Latin → en
   ocr/
-    base.py  meiki.py  rapid.py  tesseract.py
+    base.py  rapid.py  meiki.py  tesseract.py
   translate/
     base.py  deepl.py  google.py  llm.py  offline.py  cache.py
-  ui/
-    overlay.py  panel.py  tray.py
+  overlay/
+    banner.py  inplace.py
+  store/
+    history.py        # satır geçmişi (dil öğrenme için temel)
   ipc/
-    server.py  cli.py # `gsm trigger`, `gsm select`, `gsm pause`
+    server.py  cli.py # `gsm trigger`, `gsm freeze`, `gsm pause`
 tests/
 tools/
   bench.py            # makinende yakalama/OCR hızı ve CPU ölçümü
@@ -182,49 +184,164 @@ tools/
 ```toml
 [game]
 name = "Örnek Oyun"
-match_window = "OrnekOyun"      # X11'de pencere başlığından otomatik profil seçimi
+source = "monitor:1"            # monitor:N | window:<başlık eşleşmesi>
 
 [ocr]
-engine = "meiki"
-source_lang = "ja"
-preprocess = ["scale2x", "grayscale"]
+engine = "rapid"                # rapid | meiki | tesseract
+source_lang = "auto"            # auto | en | ja | zh
 
 [translate]
 engine = "deepl"
-target_lang = "tr"
+target_langs = ["tr"]           # ["tr"], ["en"] veya ["tr", "en"]
+
+[overlay]
+style = "banner"                # banner | inplace | off
 
 [[regions]]
 name = "diyalog"
-rect = [0.12, 0.72, 0.76, 0.20]  # pencereye göre oransal: x, y, genişlik, yükseklik
-mode = "auto"                    # auto | hotkey
+rect = [0.12, 0.72, 0.76, 0.20] # kaynağa göre oransal: x, y, genişlik, yükseklik
+mode = "auto"                   # auto | linked | hotkey
 fps = 3
 stable_frames = 2
+preprocess = ["scale2x", "grayscale"]
+
+[[regions]]
+name = "isim"
+rect = [0.12, 0.66, 0.20, 0.05]
+mode = "linked"
+linked_to = "diyalog"
 ```
+
+## 6. X11 mi, Wayland mı?
+
+Kısaca: Ubuntu iki "görüntü sistemi" ile gelir. **Wayland** yeni ve varsayılan
+olandır. **X11 (Xorg)** eski ama çok olgun olandır. Hangisinin kullanılacağı giriş
+ekranında seçilir, kurulum veya veri değişikliği gerektirmez. İstenirse geri
+dönülür.
+
+### 6.1 Senin için X11'in artıları
+
+1. **Bu araç için:** Ekran yakalama izinsiz ve en hızlı yolla çalışır. Global
+   kısayollar ve tam ekran oyunun üstünde duran overlay doğrudan mümkündür.
+   Wayland bunların üçünü de güvenlik gereği kısıtlar (GNOME 46'da uygulamalar
+   global kısayol bile tanımlayamaz, bu özellik GNOME 48 ile geldi).
+2. **ROS2 için:** RViz2 ve Gazebo (Harmonic) Wayland'da bilinen sorunlar yaşar.
+   Genelde `QT_QPA_PLATFORM=xcb` gibi geçici çözümler gerekir, X11'de doğrudan
+   çalışırlar.
+3. **Oyun geliştirme / yapay zeka için:** Ekran kaydı, `xdotool` ile otomasyon ve
+   editörlerin (Unity, Unreal) Linux'ta en çok test edildiği ortam X11. NVIDIA
+   kartla X11 tarafı da daha oturmuş.
+4. **Oyunlar için kayıp yok:** Steam/Proton oyunlarının çoğu Wayland'da bile X11
+   uyumluluk katmanıyla (XWayland) çalışıyor.
+
+### 6.2 Eksileri
+
+1. **Çoklu monitörde karışık yenileme hızı** (ör. 144 Hz + 60 Hz) ve **kesirli
+   ölçekleme** (%125, %150) Wayland'da daha iyi.
+2. **Güvenlik:** X11'de her uygulama ekranı ve tuşları okuyabilir. Bizim aracın
+   kolay olmasının sebebi de bu.
+3. **Gelecek:** **Ubuntu 26.04 LTS'te GNOME'un Xorg oturumu kaldırıldı.** 24.04'te
+   kaldığın sürece (destek 2029'a kadar) sorun yok. 26.04'e geçersen Wayland'a
+   mecbur kalırsın.
+
+### 6.3 Öneri
+
+**24.04'te Xorg oturumuna geç.** ROS2 Jazzy de 24.04'e bağlı olduğu için bir süre
+burada kalman muhtemel. Bu araç ve ROS2 için en sorunsuz ortam bu.
+
+Ama aracı X11'e kilitlemiyoruz. Yakalama, kısayol ve overlay soyut arayüzlerin
+arkasında olacak. Wayland desteği (Faz 3), 26.04'e geçmeden önce **zorunlu** olarak
+eklenecek.
+
+**Nasıl geçilir:**
+1. Oturumu kapat.
+2. Giriş ekranında kullanıcı adına tıkla.
+3. Sağ alttaki çark (⚙) simgesinden **"Ubuntu on Xorg"**u seç.
+4. Şifreni girip giriş yap. Seçim hatırlanır.
+5. Kontrol: `echo $XDG_SESSION_TYPE` → `x11` yazmalı.
+
+Çark simgesi görünmezse (bazı NVIDIA kurulumları) `/etc/gdm3/custom.conf`
+ayarına bakılır. O durumda birlikte bakarız.
+
+## 7. OCR motoru (EN / JA / ZH)
+
+Motorlar takılıp çıkarılabilir (`OcrEngine` arayüzü), profil veya bölge başına
+seçilir.
+
+| Motor | Rolü | Neden |
+|---|---|---|
+| **RapidOCR (PP-OCRv5, ONNX)** | **Varsayılan, üç dil için** | Tek model Çince (basit + geleneksel), Japonca ve İngilizce okur. Çince'de alanının en iyilerinden. ONNX Runtime ile CPU'da hızlı, PyTorch gerekmez. İngilizce için ayrı bir PP-OCRv5 modeli de var |
+| **meikiocr** | Japonca alternatif | Japon oyun metni ve piksel fontlar için eğitilmiş. Küçük modeller (tespit "tiny" ~30 ms CPU) |
+| **Tesseract** | İngilizce, yedek | Çok hafif. Temiz fontlarda iyi, ön işleme ister |
+| manga-ocr | İsteğe bağlı, ileride | Japoncada çok isabetli ama PyTorch ve ~1 GB+ RAM gerektirir |
+
+- **Dil tespiti (`source_lang = "auto"`):** Metin kana içeriyorsa Japonca, sadece
+  Han karakterleri varsa Çince, Latin harfleriyse İngilizce kabul edilir. Çevirmene
+  doğru kaynak dil gönderilir.
+- **Ön işleme** (bölge başına): 2x büyütme, gri ton, eşikleme veya ters çevirme
+  (koyu zemin üzerinde açık yazı), metin rengine göre renk filtresi.
+- Faz 0'da kendi oyunlarından alınmış EN/JA/ZH ekran görüntüleriyle motorlar
+  karşılaştırılıp varsayılanlar kesinleştirilecek.
+
+## 8. Çeviri (hedef: TR ve EN)
+
+`Translator` arayüzü ile takılabilir:
+
+- **DeepL API Free (varsayılan öneri):** Aylık 500k karakter, EN/JA/ZH → TR/EN
+  destekli. Çeviri sunucuda yapıldığı için bilgisayara yük bindirmez. Hesap ve
+  API anahtarı gerekir.
+- **Google Translate:** DeepL anahtarı yoksa başlangıç seçeneği.
+- **LLM API (Faz 4):** Bağlama duyarlı, oyunun tonunu koruyan çeviri. Önceki
+  satırlar ve konuşan kişinin adı (`bağlı` bölgeden) bağlam olarak gönderilir.
+- **Çevrimdışı (Faz 4):** Opus-MT veya NLLB-200 (CTranslate2, int8, CPU). Yerel
+  LLM oyunla GPU/RAM için yarıştığı için varsayılan olmayacak.
+- `target_langs = ["tr", "en"]` ile iki dil birden gösterilebilir. Dil öğrenirken
+  işe yarar.
+- Her çeviri SQLite'ta önbelleğe alınır.
+
+## 9. Dil öğrenmeye hazırlık (Anki'siz)
+
+İlk aşamada Anki yok. Ama her okunan satır şimdiden şu bilgilerle kaydedilir:
+
+| Alan | Örnek |
+|---|---|
+| Oyun / profil | Örnek Oyun |
+| Zaman | 2026-10-08 21:14:03 |
+| Konuşan | (`bağlı` isim bölgesinden) |
+| Orijinal metin + dil | `どこへ行くの？` / ja |
+| Çeviri(ler) | TR, EN |
+| Bölge kırpıntısı | küçük WebP dosyası |
+
+Böylece sonraki aşamada iki şey kolayca eklenir:
+
+- **Yerel web sayfası:** Satırlar tarayıcıda akar ve Yomitan ile kelimelerin üstüne
+  gelince sözlük açılır.
+- **Anki:** Tek tuşla cümle + ekran görüntüsü + çeviriden kart oluşturulur.
 
 ## 10. Değişim algılama (hafifliğin kalbi)
 
-Her tick'te (ör. 3 FPS):
+Her `oto` bölge için, her tick'te (ör. 3 FPS):
 
 1. Bölge yakalanır, 1/4 ölçeğe küçültülüp griye çevrilir.
 2. Önceki kareyle ortalama mutlak fark hesaplanır.
 3. Fark eşiğin üstündeyse bölge "değişiyor" sayılır. Fark eşiğin altına inip
-   `stable_frames` boyunca öyle kalırsa OCR tetiklenir.
+   `stable_frames` boyunca öyle kalırsa OCR tetiklenir. Bu bölgeye `bağlı`
+   bölgeler de aynı karede okunur.
 4. Bölgede neredeyse hiç kenar yoksa (diyalog kutusu kapalı) OCR yapılmaz.
-5. OCR sonucu bir öncekine çok benziyorsa (normalize Levenshtein > 0.9) çeviri
+5. OCR sonucu öncekine çok benziyorsa (normalize Levenshtein > 0.9) çeviri
    atlanır.
 
-Hareketli arka plan üzerindeki yazılar için eşik ve kenar oranı profil başına
-ayarlanabilir.
+Eşik ve kenar oranı, hareketli arka planlar için bölge başına ayarlanabilir.
 
 ## 11. Fazlar
 
 | Faz | İçerik | Bitti sayılması için |
 |---|---|---|
-| **0: Keşif** | Açık kararlar. Makine testi (oturum tipi, CPU/GPU). Oyunlarından örnek ekran görüntüleriyle OCR motorlarını karşılaştırma (`tools/bench.py`). X11 yakalamanın senin Wayland oturumunda çalışıp çalışmadığı | Motor ve çevirmen seçildi, ölçümler elde |
-| **1: MVP** | X11 yakalama, manuel bölge seçimi, kısayol → OCR → çeviri → basit panel + pano. Tek OCR motoru, tek çevirmen | Bir oyunda kısayolla diyalog okunup çevriliyor |
-| **2: Otomatik izleme** | Değişim algılama, stabilite, tekrar filtresi. Overlay (banner + yerinde), oyun profilleri, tray, önbellek, geçmiş | Diyalog ilerledikçe çeviri kendiliğinden geliyor, boşta CPU hedefte |
-| **3: Wayland** | Portal ScreenCast + PipeWire backend'i, IPC + CLI, GNOME kısayolu kurulum yardımcısı | Varsayılan Ubuntu oturumunda çalışıyor |
-| **4: Ekstralar** | Otomatik bölge önerisi, çevrimdışı çeviri, ek OCR motorları, bağlamlı LLM çevirisi, WebSocket/Anki entegrasyonu | Seçilenler tamam |
+| **0: Keşif** | Xorg oturumuna geçiş. `mss` ile tam ekran oyun yakalama testi. **Tam ekran oyunun üstünde overlay testi.** EN/JA/ZH ekran görüntüleriyle OCR karşılaştırması (`tools/bench.py`). Çeviri servisi seçimi | Ölçümler elde, motorlar seçildi, overlay yöntemi doğrulandı |
+| **1: MVP** | OBS tarzı düzenleyici: kaynak = monitör, canlı/dondur önizleme, çoklu dikdörtgen, [Test OCR]. Kısayol → OCR → çeviri. Sonuçlar "son satırlar" panelinde ve panoda | Bir oyunda bölge çizilip kısayolla okunup çevriliyor |
+| **2: Oyun modu** | `oto` ve `bağlı` bölgeler, değişim algılama, tekrar filtresi. Overlay (banner + yerinde), profiller, tray, önbellek, satır geçmişi | Tam ekran oyunda diyalog ilerledikçe çeviri overlay'de kendiliğinden beliriyor, CPU hedefte |
+| **3: Wayland** | Portal ScreenCast + PipeWire backend'i (bir kez izin, restore token), IPC + CLI ile GNOME kısayolu. Tam ekran üstü overlay için XWayland veya küçük bir GNOME Shell eklentisi değerlendirilir | Varsayılan Ubuntu oturumunda / 26.04'te çalışıyor |
+| **4: Öğrenme + ekstralar** | Yerel web sayfası + Yomitan, Anki entegrasyonu, LLM bağlamlı çeviri, çevrimdışı çeviri, [Öner] butonu, ek OCR motorları | Seçilenler tamam |
 | **5: Paketleme** | pipx / .deb / AppImage, ilk kurulum sihirbazı, model indirme | Temiz bir Ubuntu'ya tek komutla kuruluyor |
 
 **Test stratejisi:**
@@ -236,36 +353,27 @@ ayarlanabilir.
 
 | Risk | Önlem |
 |---|---|
-| Wayland kısıtları | X11 ile başla, Wayland'ı ayrı backend olarak ekle, Xorg oturumu alternatif |
-| Tam ekran (exclusive) oyunda overlay görünmemesi | Kenarlıksız pencere modu, ikinci monitörde panel |
-| Piksel/stilize fontlarda OCR hataları | Profil başına motor seçimi ve ön işleme |
-| JA→TR çeviri kalitesi | LLM çevirmeni veya EN pivotu |
+| Tam ekran oyunda overlay'in görünmemesi | Faz 0'da erken test. Yedekler: kenarlıksız pencere modu, ikinci monitörde panel |
+| Ubuntu 26.04'te Xorg'un olmaması | Soyut backend'ler, Faz 3 zorunlu |
+| Her tür oyunda farklı font ve stil | Bölge başına motor ve ön işleme, [Test OCR] ile hızlı ayar |
+| JA/ZH → TR çeviri kalitesi | DeepL, gerekirse LLM bağlamlı çeviri, EN'yi yanında gösterme |
 | Hareketli arka planda yanlış tetik | Eşik, stabilite ve kenar oranı ayarları |
 
 ## 13. Hazır alternatifler
 
-Benzer işi yapan açık kaynak araçlar var. Denemek, bizim aracın neyi farklı
-yapması gerektiğini netleştirir:
-
-- **Interpreter** (bquenin/interpreter): Japonca oyun metnini meikiocr ile okuyup
-  Sugoi V4 ile İngilizceye çeviriyor. Overlay'li ve çevrimdışı çalışıyor. Linux'ta
-  X11/XWayland gerektiriyor. Hedef dil İngilizce.
-- **owocr**: çok motorlu OCR aracı, ekran alanı seçimi ve tray menüsü var.
+- **Interpreter** (bquenin/interpreter): JA → EN, meikiocr + Sugoi V4, overlay'li,
+  çevrimdışı. Linux'ta X11/XWayland gerekir.
+- **owocr**: çok motorlu OCR, ekran alanı seçimi.
 - **GameSentenceMiner** (orijinal): Japonca öğrenimi ve Anki odaklı.
 
-Olası farkımız: Türkçe hedef dil, hafiflik öncelikli tasarım, Wayland desteği.
+Bizim farkımız: OBS tarzı çoklu bölge düzenleyici, EN/JA/ZH kaynak + TR/EN hedef,
+hafiflik öncelikli tasarım, Wayland'a hazır mimari.
 
-## 14. Açık kararlar
+## 14. Açık sorular
 
-1. Oyunlar hangi dilde? (Japonca / İngilizce / karışık) → OCR motorunu belirler
-2. Hedef dil Türkçe mi? Çevrimiçi çeviri (DeepL/Google/LLM) kabul mü, yoksa
-   tamamen çevrimdışı mı olmalı?
-3. `echo $XDG_SESSION_TYPE` çıktısı ne? Oyun için Xorg oturumuna geçmek sorun olur mu?
-4. Donanım: CPU, RAM, GPU (NVIDIA/AMD)? Tek monitör mü, iki mi?
-5. Oyunları nasıl oynuyorsun: Steam/Proton, emülatör, yerel Linux? Tam ekran mı,
-   pencereli mi?
-6. Amaç sadece çeviri mi, yoksa dil öğrenme de mi (sözlük, Anki)? Repo adı
-   ("sentence miner") ikincisini düşündürüyor.
-
-**Cevap gelmezse varsayılanlar:** Python + PySide6, önce X11, Japonca için
-meikiocr / diğer diller için RapidOCR, DeepL Free, manuel bölge + otomatik izleme.
+1. **Kaç monitör?** Tek monitörse "dondur" akışı, iki monitörse canlı önizleme
+   öncelikli tasarlanır.
+2. **Ekran kartı?** NVIDIA / AMD / Intel ve (NVIDIA ise) sürücü sürümü.
+3. **Xorg'a geçtikten sonra** `echo $XDG_SESSION_TYPE` çıktısı `x11` mi?
+4. **DeepL API Free anahtarı alabilir misin?** Olmazsa MVP'ye Google Translate ile
+   başlanır.
